@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>السبورة الذكية – فكرة المعلمة فاطمة هزازي</title>
+<style>
+  :root{
+    --bg:#f6f9ff; --panel:#ffffff; --ink:#101828; --muted:#667085; --accent:#2563eb; --accent-2:#60a5fa; --danger:#ef4444;
+    --grid:#e6edf7; --grid-strong:#cdd8ea;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial; background:var(--bg); color:var(--ink)}
+  header{display:flex;gap:.6rem; flex-wrap:wrap; align-items:center; padding:.6rem .8rem; background:linear-gradient(180deg,#ffffff, #f0f6ff); border-bottom:1px solid #e6e9ef; position:sticky; top:0; z-index:10}
+  header .group{display:flex; gap:.35rem; background:#fff; padding:.35rem; border:1px solid #e6e9ef; border-radius:.7rem}
+  button, select, input[type="number"], input[type="color"], input[type="checkbox"]{
+    border:1px solid #dfe3eb; background:#fff; padding:.38rem .6rem; border-radius:.55rem; cursor:pointer; font-size:.95rem; transition:.15s ease;
+  }
+  button:hover, select:hover{box-shadow:0 1px 0 rgba(16,24,40,.06)}
+  button.active{background:var(--accent); color:#fff; border-color:var(--accent)}
+  button.warn{background:var(--danger); color:#fff; border-color:var(--danger)}
+  .flex{display:flex; align-items:center; gap:.45rem}
+  #wrap{position:relative}
+  canvas{display:block; width:100vw; height:calc(100vh - 184px); background:#fff}
+  #overlay{position:absolute; inset:0; pointer-events:none}
+  #ta{position:absolute; min-width:180px; min-height:80px; font-size:20px; line-height:1.4; padding:.4rem; border:1px dashed var(--accent); background:#fff; display:none; z-index:20}
+  #thumbs{position:fixed; right:.6rem; bottom:.6rem; background:#fff; border:1px solid #e6e9ef; border-radius:.7rem; padding:.4rem; display:flex; gap:.4rem; max-width:95vw; overflow:auto}
+  .th{width:80px; height:50px; border:1px solid #dfe3eb; border-radius:.4rem; background:#f9fbff; display:grid; place-items:center; font-size:.8rem; cursor:pointer}
+  .th.active{outline:2px solid var(--accent)}
+  #symbolPad{position:fixed; left:.6rem; bottom:.6rem; background:#fff; border:1px solid #e6e9ef; border-radius:.7rem; padding:.3rem; display:grid; grid-template-columns:repeat(8,1fr); gap:.2rem; max-width:60vw}
+  #symbolPad button{padding:.25rem .35rem}
+  #toast{position:fixed; left:50%; transform:translateX(-50%); bottom:1rem; background:#111827; color:#fff; padding:.55rem .9rem; border-radius:.5rem; display:none}
+  .sep{width:1px; height:30px; background:#e6e9ef; margin:0 .2rem}
+  .hidden{display:none}
+  #brand{display:flex; align-items:center; gap:.55rem; padding:.38rem .6rem; border-radius:.7rem; border:1px solid #e6e9ef; background:#fff}
+  #brand .badge{background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff; padding:.2rem .55rem; border-radius:.45rem; font-weight:700}
+  #brand small{color:#3b82f6}
+  #arHint{position:fixed; inset:auto 0 0 0; margin:auto; width:max-content; max-width:90%; background:#111827; color:#fff; padding:.6rem .8rem; border-radius:.6rem; left:50%; transform:translateX(-50%); bottom:72px; display:none; z-index:9999}
+  #arPanel{display:flex; gap:.4rem; align-items:center}
+  #arNote{font-size:.9rem; color:#555}
+</style>
+</head>
+<body>
+
+<header>
+  <div id="brand" title="فكرة المعلمة فاطمة هزازي">
+    <span class="badge">فكرة</span>
+    <b>المعلمة فاطمة هزازي</b>
+    <small>السبورة الذكية</small>
+  </div>
+
+  <div class="group" id="tools">
+    <button data-tool="pen">✏️ قلم</button>
+    <button data-tool="eraser">🧽 ممحاة</button>
+    <button data-tool="line">／ خط</button>
+    <button data-tool="text">🔤 نص</button>
+    <button data-tool="image">🖼️ صورة</button>
+    <button data-tool="angle">∠ قياس زاوية</button>
+    <button data-tool="compass">🧭 فرجار</button>
+    <button data-tool="ruler">📏 مسطرة</button>
+    <button data-tool="protractor">⟂ منقلة</button>
+    <div class="sep"></div>
+    <select id="poly">
+      <option value="0">مُضلّع منتظم</option>
+      <option value="3">مثلث</option>
+      <option value="4">مربع</option>
+      <option value="5">خماسي</option>
+      <option value="6">سداسي</option>
+      <option value="8">ثماني</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <label class="flex">لون <input type="color" id="color" value="#111111"></label>
+    <label class="flex">سُمك <input type="number" id="w" min="1" max="40" value="3" style="width:70px"></label>
+    <button id="undo">↶ تراجع</button>
+    <button id="redo">↷ إعادة</button>
+  </div>
+
+  <div class="group">
+    <select id="bg">
+      <option value="white">خلفية: فارغة</option>
+      <option value="grid">خلفية: مربعات</option>
+      <option value="lined">خلفية: سطور</option>
+      <option value="dots">خلفية: نقاط</option>
+      <option value="axes">خلفية: محاور</option>
+    </select>
+    <label class="flex">تدرّج <input id="step" type="number" value="50" min="10" max="200" style="width:70px"></label>
+    <label class="flex">ترقيم <input id="showNums" type="checkbox" checked></label>
+  </div>
+
+  <div class="group">
+    <button id="numLine">🧮 مستقيم أعداد</button>
+    <button id="full">⛶ ملء الشاشة</button>
+    <button id="save">💾 حفظ</button>
+    <button id="load">📂 استرجاع</button>
+    <button id="export">⬇️ صورة</button>
+    <button id="print">🖨️ طباعة</button>
+    <button id="runTests">🧪 اختبارات</button>
+  </div>
+
+  <div class="group" id="arPanel" title="الواقع المعزّز / عارض ثلاثي الأبعاد">
+    <select id="arShape">
+      <option value="cube">المكعب</option>
+      <option value="box">متوازي المستطيلات</option>
+      <option value="cylinder">الأسطوانة</option>
+      <option value="sphere">الكرة</option>
+      <option value="cone">المخروط</option>
+      <option value="pyramid4">الهرم الرباعي</option>
+      <option value="pyramid3">الهرم (ثلاثي)</option>
+    </select>
+    <label class="flex">مقاس<input id="arSize" type="number" value="0.20" step="0.05" min="0.05" max="1.0" style="width:80px"></label>
+    <span id="boxDims" class="flex" title="أبعاد متوازي المستطيلات (متر)" style="display:none">
+      L<input id="boxL" type="number" value="0.30" step="0.05" min="0.05" max="2.0" style="width:70px">
+      W<input id="boxW" type="number" value="0.20" step="0.05" min="0.05" max="2.0" style="width:70px">
+      H<input id="boxH" type="number" value="0.15" step="0.05" min="0.05" max="2.0" style="width:70px">
+    </span>
+    <label class="flex">لون AR <input type="color" id="arColor" value="#2563eb"></label>
+    <label class="flex" title="تحريك/تكبير/تدوير بالإيماءات">
+      <input type="checkbox" id="arGestures" checked> إيماءات
+    </label>
+    <button id="arStart">🅰️R تشغيل</button>
+    <button id="arDelete">🗑️ حذف</button>
+    <button id="arShot">📸 لقطة</button>
+    <span id="arNote"></span>
+  </div>
+</header>
+
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <canvas id="overlay"></canvas>
+  <textarea id="ta" placeholder="أدخل النص... (Enter لسطر جديد، Esc للإلغاء)"></textarea>
+</div>
+
+<div id="thumbs"></div>
+
+<div id="symbolPad" aria-label="لوحة رموز">
+  <button>×</button><button>÷</button><button>±</button><button>≈</button>
+  <button>≠</button><button>≤</button><button>≥</button><button>√</button>
+  <button>π</button><button>θ</button><button>∠</button><button>°</button>
+  <button>∥</button><button>⟂</button><button>→</button><button>↔</button>
+  <button>∑</button><button>∫</button><button>□</button><button>△</button>
+  <button>∘</button><button>⋯</button><button>ℝ</button><button>ℤ</button>
+</div>
+
+<div id="toast"></div>
+<div id="arHint">حرّكي الهاتف ببطء لمسح السطح، ثم انقري لوضع الشكل</div>
+
+<script>
+"use strict";
+
+// مانع تعطّل عام: يعرض الخطأ بدل تجميد الأزرار
+window.addEventListener('error', (e)=>{ console.error(e); alert("خطأ في السكربت:\\n" + (e.message||e.error)); });
+
+const strings = { ar: {
+  saved:"تم الحفظ محليًا.", loaded:"تم الاسترجاع.", exported:"تم حفظ الصورة.", testsPassed:"نجحت الاختبارات ✅", testsFailed:"اختبارات فشلت ❌", page:"صفحة",
+  arUnsupported:"الواقع المعزّز غير مدعوم، سيتم فتح عارض ثلاثي الأبعاد.", arStarted:"تم تشغيل AR.", brandWatermark:"فكرة المعلمة فاطمة هزازي"
+}};
+
+// ===== Canvas setup =====
+const can = document.getElementById('c');
+const ctx = can.getContext('2d');
+const over = document.getElementById('overlay');
+const ctxO = over.getContext('2d');
+const ta = document.getElementById('ta');
+let W=0,H=0, DPR = window.devicePixelRatio || 1;
+function fit(){ W=can.clientWidth; H=can.clientHeight; can.width=W*DPR; can.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); over.width=can.width; over.height=can.height; ctxO.setTransform(DPR,0,0,DPR,0,0); draw(); }
+window.addEventListener('resize', fit); fit();
+
+const state = { tool:'pen', color:'#111111', w:3, bg:'white', gridStep:50, gridNums:true, page:0, pages:[[]], history:[], redoStack:[], temp:null, anglePoints:[], ruler:{show:false, x:120,y:120,len:300,rot:0}, protractor:{show:false,x:350,y:250,r:120,rot:0} };
+
+const $ = (s)=>document.querySelector(s); const $$=(s)=>[...document.querySelectorAll(s)];
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none', 1200);} 
+function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+function snapAngle(dx,dy){ const ang=Math.atan2(dy,dx); const snaps=[0,Math.PI/4,Math.PI/2,3*Math.PI/4,Math.PI,-Math.PI/4,-Math.PI/2,-3*Math.PI/4]; let best=snaps[0], min=1e9; for(const a of snaps){ const d=Math.abs(Math.atan2(Math.sin(ang-a), Math.cos(ang-a))); if(d<min){min=d; best=a;} } const len=Math.hypot(dx,dy); return {x:Math.cos(best)*len, y:Math.sin(best)*len}; }
+function addItem(item){ state.pages[state.page].push(item); state.history.push({type:'add', page:state.page}); state.redoStack.length=0; draw(); }
+function undo(){ const h=state.history.pop(); if(!h) return; const arr=state.pages[h.page]; h.removed=arr.pop(); state.redoStack.push(h); draw(); }
+function redo(){ const h=state.redoStack.pop(); if(!h) return; state.pages[h.page].push(h.removed); state.history.push({type:'add', page:h.page}); draw(); }
+
+function drawBG(){ ctx.save(); ctx.clearRect(0,0,W,H); ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H); const step=clamp(+$('#step').value||state.gridStep,10,200);
+  if(state.bg==='grid'){ ctx.strokeStyle='var(--grid)'; ctx.lineWidth=1; ctx.beginPath(); for(let x=0;x<=W;x+=step){ ctx.moveTo(x,0); ctx.lineTo(x,H);} for(let y=0;y<=H;y+=step){ ctx.moveTo(0,y); ctx.lineTo(W,y);} ctx.stroke(); ctx.strokeStyle='var(--grid-strong)'; ctx.beginPath(); for(let x=0;x<=W;x+=step*5){ ctx.moveTo(x,0); ctx.lineTo(x,H);} for(let y=0;y<=H;y+=step*5){ ctx.moveTo(0,y); ctx.lineTo(W,y);} ctx.stroke(); }
+  else if(state.bg==='lined'){ ctx.strokeStyle='var(--grid)'; ctx.beginPath(); for(let y=40;y<=H;y+=step){ ctx.moveTo(0,y); ctx.lineTo(W,y);} ctx.stroke(); }
+  else if(state.bg==='dots'){ ctx.fillStyle='var(--grid-strong)'; for(let y=step;y<=H;y+=step){ for(let x=step;x<=W;x+=step){ ctx.beginPath(); ctx.arc(x,y,0.9,0,Math.PI*2); ctx.fill(); } } }
+  else if(state.bg==='axes'){ const s=step; ctx.strokeStyle='#9fb3d7'; ctx.lineWidth=1.2; const cx=Math.floor(W/2/s)*s, cy=Math.floor(H/2/s)*s; ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(W,cy); ctx.moveTo(cx,0); ctx.lineTo(cx,H); ctx.stroke(); ctx.strokeStyle='var(--grid)'; ctx.beginPath(); for(let x=cx; x<=W; x+=s){ ctx.moveTo(x,0); ctx.lineTo(x,H);} for(let x=cx; x>=0; x-=s){ ctx.moveTo(x,0); ctx.lineTo(x,H);} for(let y=cy; y<=H; y+=s){ ctx.moveTo(0,y); ctx.lineTo(W,y);} for(let y=cy; y>=0; y-=s){ ctx.moveTo(0,y); ctx.lineTo(W,y);} ctx.stroke(); if(state.gridNums){ ctx.fillStyle='#5b6b86'; ctx.font='12px system-ui'; let i=0; for(let x=cx+s; x<=W; x+=s){ ++i; ctx.fillText(i, x+3, cy-3);} i=0; for(let x=cx-s; x>=0; x-=s){ --i; ctx.fillText(i, x+3, cy-3);} i=0; for(let y=cy-s; y>=0; y-=s){ ++i; ctx.fillText(i, cx+5, y-3);} i=0; for(let y=cy+s; y<=H; y+=s){ --i; ctx.fillText(i, cx+5, y-3);} } }
+  // علامة مائية
+  ctx.fillStyle='rgba(16,24,40,.10)'; ctx.font='15px system-ui'; ctx.save(); ctx.translate(W-12, H-12); ctx.rotate(-Math.PI/12); ctx.textAlign='right'; ctx.fillText(strings.ar.brandWatermark, 0,0); ctx.restore();
+  ctx.restore(); }
+
+function drawItems(){ const items=state.pages[state.page]; for(const it of items){ ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round'; if(it.type==='stroke'){ ctx.strokeStyle=it.color; ctx.lineWidth=it.w; ctx.beginPath(); ctx.moveTo(it.pts[0].x,it.pts[0].y); for(const p of it.pts.slice(1)){ ctx.lineTo(p.x,p.y);} ctx.stroke(); }
+  else if(it.type==='line'){ ctx.strokeStyle=it.color; ctx.lineWidth=it.w; ctx.beginPath(); ctx.moveTo(it.a.x,it.a.y); ctx.lineTo(it.b.x,it.b.y); ctx.stroke(); }
+  else if(it.type==='circle'){ ctx.strokeStyle=it.color; ctx.lineWidth=it.w; ctx.beginPath(); ctx.arc(it.c.x,it.c.y,it.r,0,Math.PI*2); ctx.stroke(); }
+  else if(it.type==='polygon'){ ctx.strokeStyle=it.color; ctx.lineWidth=it.w; const {c,r,n,rot=0}=it; ctx.beginPath(); for(let i=0;i<n;i++){ const a=rot + i*2*Math.PI/n; const x=c.x + r*Math.cos(a), y=c.y + r*Math.sin(a); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.closePath(); ctx.stroke(); }
+  else if(it.type==='text'){ ctx.fillStyle=it.color; ctx.font=`${it.size||20}px system-ui`; let y=it.y; for(const ln of it.lines){ ctx.fillText(ln, it.x, y); y+=(it.size||20)*1.4; } }
+  else if(it.type==='image'){ const im=new Image(); im.src=it.src; im.onload=()=>{ ctx.drawImage(im, it.x,it.y,it.w,it.h); }; }
+  else if(it.type==='numberline'){ drawNumberLine(it); }
+  else if(it.type==='angle'){ ctx.strokeStyle=it.color; ctx.lineWidth=it.w; ctx.beginPath(); ctx.moveTo(it.a.x,it.a.y); ctx.lineTo(it.b.x,it.b.y); ctx.lineTo(it.c.x,it.c.y); ctx.stroke(); ctx.fillStyle=it.color; ctx.font='16px system-ui'; ctx.fillText(`${it.deg.toFixed(1)}°`, it.b.x+8, it.b.y-8); }
+  ctx.restore(); } }
+
+function drawNumberLine(obj){ const {x1,x2,y,step,zero,labelEvery=1}=obj; ctx.save(); ctx.strokeStyle=obj.color; ctx.lineWidth=obj.w; ctx.beginPath(); ctx.moveTo(x1,y); ctx.lineTo(x2,y); ctx.stroke(); const pixStep=step; ctx.font='12px system-ui'; ctx.fillStyle=obj.color; for(let x=x1,i=0; x<=x2+1; x+=pixStep,i++){ ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x,y+6); ctx.stroke(); if(i%labelEvery===0){ ctx.fillText((i).toString(), x-3, y-10);} } ctx.restore(); }
+
+function drawOverlays(){ ctxO.clearRect(0,0,W,H); if(state.ruler.show){ const {x,y,len,rot}=state.ruler; ctxO.save(); ctxO.translate(x,y); ctxO.rotate(rot); ctxO.fillStyle='rgba(37,99,235,.08)'; ctxO.strokeStyle='rgba(37,99,235,.8)'; ctxO.lineWidth=1; ctxO.fillRect(-10,-6,len+20,30); ctxO.strokeRect(-10,-6,len+20,30); ctxO.beginPath(); for(let i=0;i<=len;i+=10){ const h=(i%50===0)?18:10; ctxO.moveTo(i,-6); ctxO.lineTo(i,-6-h); if(i%50===0){ ctxO.font='12px system-ui'; ctxO.fillStyle='rgba(37,99,235,.9)'; ctxO.fillText(i.toString(), i-6, 24);} } ctxO.stroke(); ctxO.restore(); }
+  if(state.protractor.show){ const {x,y,r,rot}=state.protractor; ctxO.save(); ctxO.translate(x,y); ctxO.rotate(rot); ctxO.strokeStyle='rgba(0,0,0,.6)'; ctxO.lineWidth=1; ctxO.beginPath(); ctxO.arc(0,0,r,Math.PI,0); ctxO.stroke(); ctxO.beginPath(); ctxO.moveTo(-r,0); ctxO.lineTo(r,0); ctxO.stroke(); for(let d=0; d<=180; d+=10){ const a=Math.PI - d*Math.PI/180, l=(d%30===0)?12:6; const x1=Math.cos(a)*r, y1=Math.sin(a)*r; const x2=Math.cos(a)*(r-l), y2=Math.sin(a)*(r-l); ctxO.beginPath(); ctxO.moveTo(x1,y1); ctxO.lineTo(x2,y2); ctxO.stroke(); if(d%30===0){ ctxO.font='12px system-ui'; ctxO.fillText(d.toString(), Math.cos(a)*(r-22)-6, Math.sin(a)*(r-22)+4);} } ctxO.restore(); }
+  const t=state.temp; if(!t) return; ctxO.save(); ctxO.lineCap='round'; ctxO.lineJoin='round'; if(t.type==='line'){ ctxO.strokeStyle=t.color; ctxO.lineWidth=t.w; ctxO.beginPath(); ctxO.moveTo(t.a.x,t.a.y); ctxO.lineTo(t.b.x,t.b.y); ctxO.stroke(); } else if(t.type==='circle'){ ctxO.strokeStyle=t.color; ctxO.lineWidth=t.w; ctxO.beginPath(); ctxO.arc(t.c.x,t.c.y,t.r,0,Math.PI*2); ctxO.stroke(); } else if(t.type==='polygon'){ ctxO.strokeStyle=t.color; ctxO.lineWidth=t.w; const {c,r,n,rot=0}=t; ctxO.beginPath(); for(let i=0;i<n;i++){ const a=rot + i*2*Math.PI/n; const x=c.x + r*Math.cos(a), y=c.y + r*Math.sin(a); if(i===0) ctxO.moveTo(x,y); else ctxO.lineTo(x,y);} ctxO.closePath(); ctxO.stroke(); } ctxO.restore(); }
+
+function draw(){ drawBG(); drawItems(); drawOverlays(); refreshThumbs(); }
+
+// ===== Interaction =====
+let down=false, start=null, lastClick={x:200,y:200};
+function pos(ev){ const r=over.getBoundingClientRect(); return {x:ev.clientX - r.left, y:ev.clientY - r.top}; }
+
+over.style.pointerEvents='auto';
+over.addEventListener('mousedown', (ev)=>{ const p=pos(ev); down=true; start=p; lastClick=p; if(state.tool==='pen'||state.tool==='eraser'){ state.temp={type:'stroke', color:(state.tool==='eraser'?'#ffffff':state.color), w:state.w, pts:[p]}; }
+  else if(state.tool==='line'){ state.temp={type:'line', color:state.color, w:state.w, a:p, b:p}; }
+  else if(state.tool==='compass'){ state.temp={type:'circle', color:state.color, w:state.w, c:p, r:0}; }
+  else if(state.tool==='text'){ openTextBox(p); }
+  else if(state.tool==='image'){ pickImage(p); }
+  else if(state.tool==='ruler'){ state.ruler.show=!state.ruler.show; drawOverlays(); }
+  else if(state.tool==='protractor'){ state.protractor.show=!state.protractor.show; drawOverlays(); }
+  else if($('#poly').value!=='0'){ const n=+$('#poly').value; state.temp={type:'polygon', color:state.color, w:state.w, c:p, r:0, n, rot:-Math.PI/2}; }
+  else if(state.tool==='angle'){ state.anglePoints.push(p); if(state.anglePoints.length===3){ const [a,b,c]=state.anglePoints; const ang=angleABC(a,b,c); addItem({type:'angle', a,b,c, deg:ang, color:state.color, w:state.w}); state.anglePoints.length=0; } }
+});
+
+over.addEventListener('mousemove', (ev)=>{ if(!down) return; const p=pos(ev); if(state.temp?.type==='stroke'){ state.temp.pts.push(p); draw(); }
+  else if(state.temp?.type==='line'){ let x2=p.x, y2=p.y; if(ev.shiftKey){ const d=snapAngle(x2-start.x, y2-start.y); x2=start.x + d.x; y2=start.y + d.y; } state.temp.b={x:x2,y:y2}; drawOverlays(); }
+  else if(state.temp?.type==='circle'){ state.temp.r=Math.hypot(p.x-start.x, p.y-start.y); drawOverlays(); }
+  else if(state.temp?.type==='polygon'){ state.temp.r=Math.hypot(p.x-start.x, p.y-start.y); drawOverlays(); }
+});
+
+over.addEventListener('mouseup', ()=>{ if(!down) return; down=false; if(!state.temp) return; const t=state.temp; if(t.type==='stroke'&&t.pts.length>1) addItem(t); else if(t.type==='line') addItem(t); else if(t.type==='circle') addItem(t); else if(t.type==='polygon') addItem(t); state.temp=null; drawOverlays(); });
+
+over.addEventListener('mouseleave', ()=>{ if(down){ down=false; state.temp=null; drawOverlays(); } });
+
+function angleABC(a,b,c){ const ab={x:a.x-b.x,y:a.y-b.y}; const cb={x:c.x-b.x,y:c.y-b.y}; const dot=ab.x*cb.x + ab.y*cb.y; const lab=Math.hypot(ab.x,ab.y), lcb=Math.hypot(cb.x,cb.y); const cos=clamp(dot/(lab*lcb), -1, 1); const rad=Math.acos(cos); return rad*180/Math.PI; }
+
+function openTextBox(p){ ta.style.left=p.x+'px'; ta.style.top=p.y+'px'; ta.style.display='block'; ta.value=''; ta.focus(); const commit=()=>{ const lines=ta.value.split(/\\n/); if(lines.join('').trim().length){ addItem({type:'text', x:p.x, y:p.y, lines, color:state.color, size:20}); } ta.style.display='none'; ta.value=''; }; const cancel=()=>{ ta.style.display='none'; ta.value=''; }; const key=(e)=>{ if(e.key==='Escape'){ cancel(); } if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='enter'){ commit(); } }; ta.onblur=commit; ta.onkeydown=key; }
+
+function pickImage(p){ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=()=>{ const f=inp.files && inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ const im=new Image(); im.onload=()=>{ const scale=Math.min(400/im.width, 300/im.height, 1); addItem({type:'image', src:rd.result, x:p.x, y:p.y, w:im.width*scale, h:im.height*scale}); }; im.src=rd.result; }; rd.readAsDataURL(f); }; inp.click(); }
+
+function refreshThumbs(){ const box=$('#thumbs'); box.innerHTML=''; state.pages.forEach((_,i)=>{ const d=document.createElement('div'); d.className='th'+(i===state.page?' active':''); d.textContent=`${strings.ar.page} ${i+1}`; d.addEventListener('click', ()=>{ state.page=i; draw();}); box.appendChild(d); }); const add=document.createElement('div'); add.className='th'; add.textContent='+'; add.title='صفحة جديدة'; add.addEventListener('click', ()=>{ state.pages.push([]); state.page=state.pages.length-1; draw(); }); box.appendChild(add); }
+
+$('#symbolPad').addEventListener('click', (e)=>{ if(e.target.tagName!=='BUTTON') return; const sym=e.target.textContent; if(ta.style.display==='block'){ const s=ta.selectionStart||ta.value.length; ta.value = ta.value.slice(0,s) + sym + ta.value.slice(s); ta.focus(); } else { addItem({type:'text', x:lastClick.x, y:lastClick.y, lines:[sym], color:state.color, size:24}); } });
+
+for(const b of $$('#tools button[data-tool]')){ b.addEventListener('click', ()=>{ $$('#tools button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); state.tool=b.dataset.tool; }); }
+$('#color').addEventListener('input', e=>{ state.color=e.target.value; });
+$('#w').addEventListener('input', e=>{ state.w=+e.target.value; });
+$('#bg').addEventListener('change', e=>{ state.bg=e.target.value; draw(); });
+$('#step').addEventListener('input', e=>{ state.gridStep=+e.target.value||50; draw(); });
+$('#showNums').addEventListener('change', e=>{ state.gridNums=e.target.checked; draw(); });
+$('#numLine').addEventListener('click', ()=>{ const y=Math.round(H*0.8); addItem({type:'numberline', x1:60, x2:W-60, y, step:50, zero:0, labelEvery:1, color:state.color, w:2}); });
+$('#undo').addEventListener('click', undo); $('#redo').addEventListener('click', redo);
+$('#full').addEventListener('click', ()=>{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); });
+$('#save').addEventListener('click', ()=>{ localStorage.setItem('smartboard_pages', JSON.stringify(state.pages)); toast(strings.ar.saved); });
+$('#load').addEventListener('click', ()=>{ const raw=localStorage.getItem('smartboard_pages'); if(!raw) return; try{ state.pages=JSON.parse(raw)||[[]]; state.page=0; draw(); toast(strings.ar.loaded);} catch(e){ console.error(e);} });
+$('#export').addEventListener('click', ()=>{ const a=document.createElement('a'); a.download='board.png'; a.href=can.toDataURL('image/png'); a.click(); toast(strings.ar.exported); });
+$('#print').addEventListener('click', ()=>{ window.print(); });
+
+// ===== Tests =====
+function runTests(){ const results=[]; const ok=(n,c)=>{results.push({test:n, pass:!!c}); if(!c) console.warn('❌',n);}; try{ const t="كلمة: إذا كانت"; void(t); ok('Arabic words inside strings', true);}catch(e){ ok('Arabic words inside strings', false);} const split="a\\nb\\nc".split(/\\n/); ok('Split /\\\\n/', split.length===3 && split[1]==='b'); const s0=snapAngle(100,10); ok('Snap ~0°', Math.abs(Math.atan2(s0.y,s0.x))<0.15); ok('UI buttons present', !!document.getElementById('undo') && !!document.getElementById('arStart')); console.table(results); const failed=results.filter(r=>!r.pass); toast(failed.length?strings.ar.testsFailed:strings.ar.testsPassed); }
+$('#runTests').addEventListener('click', runTests);
+
+// ===== Cross‑browser AR/3D fallback =====
+const arShapeSel=$('#arShape'); const arSize=$('#arSize'); const arColor=$('#arColor'); const boxDims=$('#boxDims'); const boxL=$('#boxL'); const boxW=$('#boxW'); const boxH=$('#boxH'); const arGestures=$('#arGestures'); const arHint=$('#arHint'); const arNote=$('#arNote');
+function toggleBoxDims(){ boxDims.style.display = (arShapeSel.value==='box')? 'flex':'none'; }
+arShapeSel.addEventListener('change', toggleBoxDims); toggleBoxDims();
+
+function hasWebXR(){ return !!(navigator.xr && navigator.xr.isSessionSupported); }
+
+$('#arStart').addEventListener('click', async ()=>{
+  try{
+    if(await (hasWebXR()? navigator.xr.isSessionSupported('immersive-ar'): Promise.resolve(false))){
+      startARNative();
+    } else {
+      arNote.textContent = strings.ar.arUnsupported;
+      openSimple3DViewer();
+    }
+  }catch(err){ arNote.textContent = strings.ar.arUnsupported; openSimple3DViewer(); }
+});
+
+$('#arDelete').addEventListener('click', ()=>{ const ev=new CustomEvent('SB_AR_DELETE'); window.dispatchEvent(ev); });
+$('#arShot').addEventListener('click', ()=>{ const ev=new CustomEvent('SB_AR_SNAPSHOT'); window.dispatchEvent(ev); });
+
+function openSimple3DViewer(){
+  const modal=document.createElement('div'); modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;z-index:99999;';
+  const box=document.createElement('div'); box.style.cssText='width:min(92vw,900px);height:min(70vh,560px);background:#fff;border-radius:10px;overflow:hidden;display:grid;grid-template-rows:auto 1fr';
+  const bar=document.createElement('div'); bar.style.cssText='display:flex;gap:.5rem;align-items:center;justify-content:space-between;padding:.5rem .8rem;border-bottom:1px solid #e6e9ef;background:#fafbff';
+  const title=document.createElement('b'); title.textContent='معاينة ثلاثية الأبعاد (بدون AR)';
+  const close=document.createElement('button'); close.textContent='إغلاق'; close.onclick=()=>modal.remove();
+  bar.append(title, close);
+  const mount=document.createElement('div'); mount.style.cssText='position:relative;';
+  box.append(bar,mount); modal.append(box); document.body.append(modal);
+
+  (async()=>{
+    const [{default:THREE},{OrbitControls}] = await Promise.all([
+      import('https://unpkg.com/three@0.160.0/build/three.module.js'),
+      import('https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js')
+    ]);
+    const renderer=new THREE.WebGLRenderer({antialias:true, alpha:true}); mount.append(renderer.domElement);
+    const scene=new THREE.Scene(); const camera=new THREE.PerspectiveCamera(60,1,0.01,100); camera.position.set(0.6,0.5,0.9);
+    const controls=new OrbitControls(camera, renderer.domElement); controls.enableDamping=true;
+    scene.add(new THREE.HemisphereLight(0xffffff,0x444444,1.2)); const dir=new THREE.DirectionalLight(0xffffff,0.8); dir.position.set(1,2,1); scene.add(dir);
+
+    function makeMesh(kind,size=0.2,color='#2563eb', dims=null){ const mat=new THREE.MeshStandardMaterial({color, metalness:0.1, roughness:0.8}); let mesh; switch(kind){ case 'cube': mesh=new THREE.Mesh(new THREE.BoxGeometry(size,size,size),mat); break; case 'box': { const L=Math.max(0.01, parseFloat(dims?.L ?? size*2)); const W=Math.max(0.01, parseFloat(dims?.W ?? size)); const H=Math.max(0.01, parseFloat(dims?.H ?? size*0.75)); mesh=new THREE.Mesh(new THREE.BoxGeometry(L,W,H),mat); break;} case 'cylinder': mesh=new THREE.Mesh(new THREE.CylinderGeometry(size*0.5,size*0.5,size*1.5,24),mat); break; case 'sphere': mesh=new THREE.Mesh(new THREE.SphereGeometry(size*0.75,32,16),mat); break; case 'cone': mesh=new THREE.Mesh(new THREE.ConeGeometry(size*0.6,size*1.4,24),mat); break; case 'pyramid4': mesh=new THREE.Mesh(new THREE.ConeGeometry(size*0.7,size*1.2,4),mat); break; case 'pyramid3': mesh=new THREE.Mesh(new THREE.ConeGeometry(size*0.7,size*1.2,3),mat); break; default: mesh=new THREE.Mesh(new THREE.BoxGeometry(size,size,size),mat);} mesh.castShadow=true; mesh.receiveShadow=true; return mesh; }
+
+    const size=parseFloat(arSize.value)||0.2; const color=arColor.value||'#2563eb'; const kind=arShapeSel.value; const dims = (kind==='box')? {L:parseFloat(boxL.value)||0.3, W:parseFloat(boxW.value)||0.2, H:parseFloat(boxH.value)||0.15} : null;
+    const mesh=makeMesh(kind,size,color,dims); scene.add(mesh);
+
+    const grid=new THREE.GridHelper(2,20,0x888888,0xdddddd); grid.position.y=-0.001; scene.add(grid);
+
+    function resize(){ const r=mount.getBoundingClientRect(); renderer.setSize(r.width, r.height); camera.aspect=r.width/r.height; camera.updateProjectionMatrix(); }
+    const ro=new ResizeObserver(resize); ro.observe(mount); resize();
+
+    function loop(){ controls.update(); renderer.render(scene,camera); requestAnimationFrame(loop);} loop();
+
+    function snapshot(){ try{ const a=document.createElement('a'); a.download='three-preview.png'; a.href=renderer.domElement.toDataURL('image/png'); a.click(); }catch(e){ console.error(e);} }
+    window.addEventListener('SB_AR_SNAPSHOT', snapshot, {once:false});
+    window.addEventListener('SB_AR_DELETE', ()=>{ try{ scene.remove(mesh);}catch{} });
+  })();
+}
+
+async function startARNative(){
+  const mod = await import('https://cdn.jsdelivr.net/gh/rasmcom/lite-ar@main/sb-ar.js');
+  mod.runSmartboardAR({
+    shape: document.getElementById('arShape').value,
+    size: parseFloat(document.getElementById('arSize').value) || 0.2,
+    color: document.getElementById('arColor').value || '#2563eb',
+    boxDims: {
+      L: parseFloat(document.getElementById('boxL').value)||0.3,
+      W: parseFloat(document.getElementById('boxW').value)||0.2,
+      H: parseFloat(document.getElementById('boxH').value)||0.15,
+    },
+    gestures: document.getElementById('arGestures').checked
+  });
+  document.getElementById('arNote').textContent = strings.ar.arStarted;
+}
+
+// init
+$$('#tools button[data-tool]')[0].classList.add('active');
+draw();
+</script>
+</body>
+</html>
